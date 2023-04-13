@@ -1,0 +1,472 @@
+---
+title: "Assessment 1 - COVID-19 impact on digital learning"
+author: "Viet Cuong Truong - 47476184"
+date: "2023-04-06"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Cleaning and Wrangling
+
+Import libraries
+
+```{r}
+library(tidyverse) 
+library(dplyr)
+library(ggplot2)
+library(viridis)
+library(highcharter)
+library(webshot)
+webshot::install_phantomjs()
+```
+
+### Product files
+
+Import the prodict_info file into the dataset
+
+```{r}
+#import file
+products <- read_csv("products_info.csv",na = c("NaN", "Na")) 
+```
+
+```{r}
+#show summary data of tibble
+str(products) 
+```
+
+```{r}
+#inspect the data by printing the first few rows
+head(products) 
+```
+
+Now we will clean the data. First, let's examine if the dataset has null values
+
+```{r}
+#check if there are any missing values or NAs
+any(is.na(products))
+```
+
+Let see the Sector column
+
+```{r}
+unique(products$`Sector(s)`) #Sectors column
+```
+
+There are lots of errors in the data that need cleaning. We will have to change "PreK-122", "PreK-112", "PPreK-12" to "PreK-12" and "PreK-12; Higher; Corporate" to "PreK-12; Higher Ed; Corporate"
+
+```{r}
+products_clean <- products %>% 
+  # change "PreK-122", "PreK-112", "PPreK-12" to "PreK-12"
+  mutate(`Sector(s)` = ifelse(grepl("(PreK-122|PreK-112|PPreK-12)", `Sector(s)`, ignore.case = TRUE), "PreK-12",  `Sector(s)`), 
+  # change "PreK-12; Higher; Corporate" to "PreK-12; Higher Ed; Corporate"
+         `Sector(s)` = ifelse(grepl("PreK-12; Higher; Corporate", `Sector(s)`, ignore.case = TRUE), "PreK-12; Higher Ed; Corporate",  `Sector(s)`)) 
+unique(products_clean$`Sector(s)`) # check the unique data again in the Sector column
+```
+
+Our data appears to be ready. Let's move on to Districts data
+
+### District files
+
+Import the prodict_info file into the dataset
+
+```{r}
+#import file
+districts <- read_csv("districts_info.csv",na = c("NaN", "Na", ""))
+```
+
+```{r}
+#show summary data of tibble
+str(districts) 
+```
+
+```{r}
+#inspect the data by printing the first few rows
+head(districts)
+```
+
+There are lots of NA values in the dataset. Let's see how many incomplete rows are in the districts dataset.
+
+```{r}
+# Calculate the number of rows with missing values in the "districts" data frame
+sum(!complete.cases(districts))
+```
+
+Remove all the NA, NAN and empty from the data
+
+```{r}
+# Remove null value 
+districts_clean <- na.omit(districts)
+```
+
+Here we have several variables that we will turn into factors.
+
+\* State, district_id, and locale are fairly self-explanatory.
+
+\* The pct_black.hispanic and pct_free.reduced variables appear to be ordered categorical variables that represent a percentage-group.
+
+We will convert the various variables in this situation into factors.
+
+```{r}
+# check the unique data
+unique(districts_clean$locale) 
+```
+
+Change the typo in the districts data
+
+```{r}
+# Locale
+districts_clean <- districts_clean %>% mutate(locale = ifelse(locale == "Cit", "City", 
+                                          ifelse(locale == "Sub", "Suburb", locale)))
+unique(districts_clean$locale) # check the data again 
+```
+
+Change the format and remove unwanted characters from PCT_black/hispanic column
+
+```{r}
+# Pct_black/hispanic
+districts_clean$`pct_black/hispanic` <- str_trim(districts_clean$`pct_black/hispanic`) # remove white space
+districts_clean$`pct_black/hispanic` <- ifelse(districts_clean$`pct_black/hispanic` == "[0, 0.2[" , "0-20%", 
+                                      (ifelse(districts_clean$`pct_black/hispanic` == "[0.2, 0.4[" , "20-40%",
+                                              (ifelse(districts_clean$`pct_black/hispanic` == "[0.4, 0.6[" , "40-60%",
+                                                      (ifelse(districts_clean$`pct_black/hispanic` == "[0.6, 0.8[" , "60-80%",
+                                                              (ifelse(districts_clean$`pct_black/hispanic` == "[0.8, 1[" , "80-100%", NaN) )))))))) # change the data to percentage
+```
+
+Change the format and remove unwanted characters from Pct_free/reduced column
+
+```{r}
+# Pct_free/reduced
+districts_clean$`pct_free/reduced` <- str_trim(districts_clean$`pct_free/reduced`) # remove white space
+districts_clean$`pct_free/reduced` <- ifelse(districts_clean$`pct_free/reduced` == "[0, 0.2[" , "0-20%", 
+                                    (ifelse(districts_clean$`pct_free/reduced`== "[0.2, 0.4[" , "20-40%",
+                                            (ifelse(districts_clean$`pct_free/reduced` == "[0.4, 0.6[" , "40-60%",
+                                                    (ifelse(districts_clean$`pct_free/reduced` == "[0.6, 0.8[" , "60-80%",
+                                                            (ifelse(districts_clean$`pct_free/reduced` == "[0.8, 1[" , "80-100%", NaN) )))))))) # change the data to percentage
+```
+
+Change the format and remove unwanted characters from PP_Total_raw column
+
+```{r}
+## PP_Total_raw
+districts_clean$pp_total_raw <- gsub( "[", "", districts_clean$pp_total_raw, fixed = TRUE ) # replace "[" to " "
+districts_clean$pp_total_raw <- gsub( ", ", "-", districts_clean$pp_total_raw, fixed = TRUE ) # replace "," to "-"
+```
+
+Change the format and remove unwanted characters from county connection ratio column
+
+```{r}
+## county connection ratio 
+districts_clean$county_connections_ratio <- gsub( "[", "", districts_clean$county_connections_ratio, fixed = TRUE ) # replace "[" to " "
+districts_clean$county_connections_ratio <- gsub( ", ", "-", districts_clean$county_connections_ratio, fixed = TRUE )# replace "," to "-"
+```
+
+After cleaning the data, let's see the districts data again
+
+```{r}
+head(districts_clean)
+```
+
+### Engagement files
+
+```{r}
+# import engagement data
+Engagement_Data <- list.files("Engagement Data/")
+Engagement_Data_2 <- paste0("Engagement Data//", Engagement_Data)
+
+engage <- lapply(Engagement_Data_2, read_csv) %>%
+  bind_rows(.id = "source")
+```
+
+```{r}
+head(engage)
+```
+
+We will combine the data with the districts_file where the ID of an engagement matches the ID of a district. Then, we will merge this data with the products file where the lp_ID in the engagement file matches the Lp_id in the products file.
+
+First we have to convert the Lp_id in the products table to lp_id
+
+```{r}
+names(products_clean)[1] <- "lp_id"
+```
+
+then we merge with 2 tables
+
+```{r}
+disctrict_joiner <- data.frame(district_id = districts_clean$district_id, source = as.character(1:nrow(districts_clean)))
+
+engage <- engage %>%
+  left_join(disctrict_joiner, by = "source")
+
+engage <- engage %>%
+  left_join(districts_clean, by = "district_id")
+
+engage <- engage %>%
+  left_join(products_clean, by = "lp_id")
+```
+
+Let's see the first few rows of the engage dataset
+
+```{r}
+#inspect the data by printing the first few rows
+head(engage)
+```
+
+Then we drop all the null values
+
+```{r}
+engage_clean <- na.omit(engage)
+head(engage_clean)
+```
+
+```{r}
+# check the unique in the time column
+unique(engage_clean$time)
+```
+
+There are errors in the data collection process. Due to the range of the dataset ("1/01/2020" to "31/12/2020"), we will remove these dates ("31/12/1020", "1/01/2044", "1/01/2050", "1/01/2033", and "1/01/2024").
+
+```{r}
+# Create a logical index of rows
+keep_rows <- !(engage_clean$time %in% c("31/12/1020", "1/01/2044", "1/01/2050", "1/01/2033","1/01/2022"))
+
+# Subset the data frame to keep only the rows that meet the condition
+engage_clean <- subset(engage_clean, keep_rows)
+
+# check the unique in the time column again 
+unique(engage_clean$time)
+
+```
+
+## Data Visualization
+
+### Product files
+
+First let's see what is the most served sector in the Products
+
+The bar plot is a suitable choice for visualizing the most served sectors because it can effectively display the total number of products served to each sector. With the bar plot, it is easy to compare the number of products served in each sector by simply comparing the height of the bars.
+
+```{r,echo=FALSE}
+# what is the most served sector 
+essential<-products_clean%>%group_by(`Sector(s)`)%>%count(`Sector(s)`,name="Most served sectors")%>%arrange(-`Most served sectors`) # create a table count the Sectors  
+essential1<- essential[-4,] # drop the empty value
+
+ggplot(data=essential1)+
+  geom_col(mapping=aes(x=reorder(`Sector(s)`,`Most served sectors`),y=`Most served sectors`,fill=`Sector(s)`))+
+  coord_flip()+
+  scale_fill_brewer(palette="Pastel1")+
+  theme(legend.position="none")+
+  labs(title="Most served sectors",x="Sectors",subtitle="Total number of products served to each sector")+
+  geom_label(aes(`Sector(s)`,`Most served sectors`,label=`Most served sectors`))
+
+```
+
+We can see that "PreK--12" appears 170 times in the data file, which shows that a sizable portion of digital learning materials are targeted towards K--12 students. This could be because most kids in the US have to go to school from K--12, and there is a high demand for digital learning resources to meet that need.
+
+Similarly, "PreK-12; Higher Ed; Corporate" also appears 140 times, indicating that a significant number of digital learning products have been developed for multiple sectors, including K-12, higher education, and corporate training. This could be because digital learning products can be customised to meet the needs of different audiences, and many providers offer products that can be used across multiple sectors.
+
+As the phrase "PreK--12; Higher Ed" only appears 65 times in the data file, the market for digital learning products aimed at K--12 and higher education is not very big. Because K--12 and higher education are two different markets with different needs and requirements, it may be harder to make products that work well in both.
+
+Next we will see about the Primary Essential Functions
+
+The pie chart is a useful visualization to show the proportion of each category in a dataset. In this case, we are showing the proportion of each primary essential function in the products_clean dataset. The pie chart is particularly useful in this case because we are interested in understanding the relative popularity of each primary essential function. By using a pie chart, we can easily see which functions are more popular and which are less popular, and we can also see the proportion of each function relative to the others.
+
+```{r,echo=FALSE}
+sectors <- products_clean %>%
+  group_by(`Primary Essential Function`) %>%
+  count(`Primary Essential Function`, name = "Most popular product functions") %>%
+  arrange(-`Most popular product functions`)
+
+pie_chart <- sectors %>% 
+  hchart("pie", hcaes(x = `Primary Essential Function`, y = `Most popular product functions`, fill = `Primary Essential Function`)) %>% hc_plotOptions (series = list (animation = FALSE))%>%
+  hc_title(text = "Most popular primary essential functions.")%>%
+  hc_size(height = 600, width = 1000)
+
+pie_chart
+```
+
+-   The most popular product function is "LC - Digital Learning Platforms", accounting for 28.5% of the total products.
+-   The second most popular function is "LC - Sites, Resources & Reference", accounting for 18% of the total products.
+-   "LC - Content Creation & Curation" and "LC - Study Tools" are also popular, accounting for 13.8% and 9.5% of the total products, respectively.
+-   Other functions have a relatively smaller market share, with most accounting for less than 5% of the total products.
+
+Overall, the data suggests that digital learning platforms and resources are the most in-demand product functions, with a significant proportion of products falling under these categories.
+
+### District files
+
+**Locale distribution**
+
+```{r,echo=FALSE}
+districts_clean %>% 
+  count(locale) %>%
+  mutate(pct = prop.table(n) * 100) %>%
+  ggplot(aes(x = "", y = pct, fill = locale)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  labs(title = "Locale Distribution", fill = "Locale") +
+  scale_fill_discrete(labels = c("City", "Rural", "Suburb", "Town")) +
+  geom_text(aes(label = paste0(round(pct), "%")), position = position_stack(vjust = 0.5)) +
+  theme_void()
+```
+
+The chart shows that the majority of the dataset is located in suburban areas, with 58% falling into this category. This suggests that suburban areas are disproportionately represented in the dataset compared to other types of locations.
+
+Moreover, the graph shows that only 17% of schools are located in rural areas, 15% in the city, and 10% in town. This could potentially be significant if there are important differences in digital learning outcomes or experiences between rural, city, town, and suburban areas.
+
+**Percentage of Students Eligible for Free or Reduced-price Lunch**
+
+```{r,echo=FALSE}
+districts_clean %>%
+  count(`pct_free/reduced`) %>%
+  mutate(pct = prop.table(n) * 100) %>%
+  ggplot(aes(x = "", y = pct, fill = `pct_free/reduced`)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  labs(title = "Percentage of Students Eligible for Free or Reduced-price Lunch", fill = "Percentage") +
+  scale_fill_discrete(labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%")) +
+  geom_text(aes(label = paste0(round(pct), "%")), position = position_stack(vjust = 0.5)) +
+  theme_void()
+```
+
+The graph depicts the percentage of students who qualify for free or reduced-cost lunches across various categories. This plot could potentially be useful for identifying schools or districts with higher or lower levels of need. The majority of students qualify for the reduced-price lunch range of 20 to 60%, while only a small percentage qualify for the highest and lowest ranges. This could suggest that the majority of students come from low- to middle-income families.
+
+**Percentage of Black or Hispanic Students**
+
+```{r,echo=FALSE}
+# create pie chart for pct_black/hispanic
+districts_clean %>%
+  count(`pct_black/hispanic`) %>%
+  mutate(pct = prop.table(n) * 100) %>%
+  ggplot(aes(x = "", y = pct, fill = `pct_black/hispanic`)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  labs(title = "Percentage of Black or Hispanic Students", fill = "Percentage") +
+  scale_fill_discrete(labels = c("0-20%", "20-40%", "40-60%", "60-80%", "80-100%")) +
+  geom_text(aes(label = paste0(round(pct), "%")), position = position_stack(vjust = 0.5)) +
+  theme_void()
+
+```
+
+The third graph illustrates the percentage of Black and Hispanic students in each category. The majority of Black and Hispanic students fall within the 0-20% range, indicating a higher level of need compared to other groups.
+
+### Engagement files
+
+For the engagement files, we aim to determine the most popular products that students have been using throughout the year 2020. To achieve this, we will need to analyze the data and identify the products that have been accessed the most by students during this time period.
+
+```{r,echo=FALSE}
+# Use the aggregate() function to calculate the total engagement index for each product
+total_engagement <- aggregate(engagement_index ~ engage_clean$`Product Name`, data = engage_clean, FUN = sum)
+
+# Sort the total_engagement data frame in descending order by total_engagement_index
+total_engagement <- total_engagement[order(total_engagement$engagement_index, decreasing = TRUE),]
+
+# Select the top 20 products based on their total engagement index using the head() function
+top_products <- head(total_engagement, 20)
+
+# Rename the column "engage$Product Name" to "product_name"
+colnames(top_products)[colnames(top_products) == "engage_clean$`Product Name`"] <- "product_name"
+top_products$product_name <- reorder(top_products$product_name, top_products$engagement_index)
+
+# Create a bar plot of the top 20 products using ggplot2
+ggplot(top_products, aes(x = engagement_index, y = product_name, fill = product_name)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  scale_fill_viridis(discrete = TRUE) +
+  xlab("Product Name") +
+  ylab("Total Engagement Index") +
+  ggtitle("Top 20 Products by Engagement Index") +
+  scale_x_continuous(labels = scales::comma) +
+  guides(fill = "none")
+```
+
+According to the engagement index in the chart, these are the top 20 digital learning tools that students will use the most in 2020. The engagement index is a metric that looks at how often and for how long students use a product to figure out how interested they are in it.
+
+Most of the items on the list are made by Google. Google Docs and Google Classroom are at the top, followed by Canvas and Meet. Kahoot!, YouTube, and Zoom are some other popular products. Some learning tools, like ALEKS and Lexia Core5 Reading, and game-based learning platforms, like CoolMath Games, are also on the list.
+
+In the LearnPlatform COVID-19 Impact on Digital Learning we will analyze the engagement_index of students using various educational products throughout the year 2020. We will examine the changes in the engagement_index over the course of the month and identify any patterns or trends that may emerge.
+
+```{r, echo=FALSE}
+# Convert the 'time' column to a date format
+engage_clean$time <- as.Date(engage_clean$time, format = "%d/%m/%Y")
+
+# Create a new column for the month
+engage_clean$month <- format(engage_clean$time, "%m")
+
+# Group by month and calculate the mean engagement_index
+engage_monthly <- engage_clean %>%
+  group_by(month) %>%
+  summarize(mean_engagement = mean(engagement_index))
+
+pct_access_monthly <- engage_clean %>%
+  group_by(month) %>%
+  summarize(mean_pct_access = mean(pct_access))
+
+# Create the plot for the Engagement_index
+# Create data frame to define the summer break period
+summer_break <- data.frame(xmin = 5.5, xmax = 8.5, ymin = -Inf, ymax = Inf)
+
+# Create data frame to define the COVID-19 start annotation
+annotation <- data.frame(x = 2.5, y = 1.6, label = "COVID-19 Start")
+
+# Create the plot using ggplot2
+ggplot(data = engage_monthly, aes(x = month, y = mean_engagement)) + 
+  geom_line(aes(group = 1), color = "#117DBB", linewidth = 1.5) + 
+  geom_rect(data = summer_break, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax), 
+            fill = "blue", alpha = 0.3, inherit.aes = FALSE) +
+  geom_vline(xintercept = 3, linetype = "dashed", color = "red", linewidth = 1) + 
+  labs(x = "Month", y = "Mean Engagement Index", title = "Monthly Mean Engagement Index") + 
+  annotate("text", x = 7, y = 250, label = "Summer Break", color = "blue", size = 4.5) + 
+  annotate("text", x = annotation$x, y = annotation$y, label = annotation$label, 
+           color = "red", size = 4) +
+  scale_x_discrete(limits = c("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"), 
+                   labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")) +
+  theme_minimal() + 
+  theme(plot.title = element_text(face = "bold", size = 16), 
+        axis.title = element_text(face = "bold", size = 14), 
+        axis.text = element_text(size = 12), 
+        axis.line = element_line(color = "black"), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        panel.border = element_blank())
+
+```
+
+Based on the data given, it looks like the average level of engagement on digital learning platforms changes over the course of the year. The level of engagement is low in January and February, but it steadily goes up in March and reaches its peak in April.
+
+In May and June, however, the level of engagement drops sharply, and in July it hits its lowest point. From there, it starts to get better again slowly in August and September, and then it peaks again in October. In November and December, the level of engagement stays pretty high, but at the end of the year, it goes down a little.
+
+## Insights
+
+-   Google products dominate the list: Out of the top 10 most popular products used by students, 7 are Google products. This shows that Google products are popular and widely used in the education field.
+
+-   People use video conferencing tools a lot. Tools like Meet, Zoom, and Zearn are in the top 20 most popular products, which shows that online video conferencing is being used more and more for remote learning.
+
+-   Personalized learning platforms are also popular: ALEKS, Lexia Core5 Reading, and Zearn are some of the most popular products that students use to learn in a way that fits their needs.
+
+-   People want free resources for learning: Epic! - Unlimited Books for Kids is a popular product that lets kids read digital books for free from a huge library. This shows that people want free educational materials, especially during the COVID-19 pandemic.
+
+-   The engagement index varies a lot. It is a way to measure how much students are using a certain product. Based on the data, we can see that the engagement index for different products is very different, with some having a much higher engagement index than others. This could be because of many things, like the quality of the product, how easy it is to use, and how interested students are.
+
+-   After the pandemic started, there is a sharp drop in the amount of engagement. It begins to rise again during the middle of summer. This indicates that the majority of students did not attend spring semester classes following the outbreak of the pandemic.
+
+-   Digital learning has changed a lot because of the COVID-19 pandemic. With schools closed and students learning from home, there has been a surge in the use of digital learning platforms.
+
+-   Digital learning platforms are used in different ways at different times of the year and during different seasons. Engagement is usually at its highest when students are in school and at its lowest when school is out for the summer.
+
+-   There may be differences in how different kinds of online learning platforms are used (e.g. those focused on specific subjects, those used by different age groups).
+
+## Conclution
+
+In conclusion, some intriguing new information about the US digital learning landscape has emerged from the data analysis of the LearnPlatform dataset. The dataset includes information on the products, districts, and student engagement, allowing us to gain a comprehensive understanding of the trends and patterns in digital learning.
+
+From analyzing the product files, we've learned that digital learning products are most popular in the K-12 market and that digital learning platforms and resources are the most-requested product functions. In comparison to other types of locations, suburban areas are disproportionately represented in the dataset, and the majority of students come from low- to middle-income families, according to the analysis of the district files.
+
+From the district files dataset suburbs are overrepresented in the dataset when compared to other kinds of locations. Only 17% of schools are in rural areas, 15% are in cities, and 10% are in towns; the majority are in suburban areas. Additionally, a sizable portion of students qualify for free or reduced-price lunch, indicating that socioeconomic status should be taken into account when analysing the outcomes and experiences of digital learning.
+
+The top 20 digital learning tools that students used the most in 2020, with Google products being the most popular, were identified through analysis of the engagement files. Additionally, we've noticed that the degree of engagement on digital learning platforms varies throughout the year, with a notable rise in March and April and a decline in May and June.
+
+Overall, The LearnPlatform dataset provides important insight into the American digital learning landscape. However, with only five engagement files available for analysis, it has limited ability to inform policy development and decision-making towards improving digital learning outcomes for all students.

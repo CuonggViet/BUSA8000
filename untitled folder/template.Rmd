@@ -1,0 +1,55 @@
+---
+title: "Assesssment 1 - COVID-19 impact on digital learning"
+author: "Student Name and ID"
+date: "2023-03-10"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+student_ID: 123
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Data Cleaning and Wrangling
+
+**Describe and show the data cleaning and wrangling process' that you have completed. Provide justification on any transformation you have completed.**
+
+<br> <br>
+
+you can embed your code like this:
+
+```{r, summary-stats, echo=TRUE}
+x <- 1:10    # create an x variable
+y <- 10:1    # create a y variable
+dataf <- data.frame(x = x, y = y)
+
+summary(dataf)
+```
+
+\newpage
+
+## Data Visualisation
+
+**Provide evidence of your visualisation techniques and the reason for your choice of visual tools.**
+
+<br>
+
+You can also embed plots, for example:
+
+```{r, simple-plot, echo=FALSE}
+x <- 1:10    # create an x variable
+y <- 10:1    # create a y variable
+dataf <- data.frame(x = x, y = y)
+plot(dataf$x, dataf$y, xlab = "x axis", ylab = "y axis")
+```
+
+\newpage
+
+## Findings
+
+**Clearly explain your findings and provide a valid conclusion of your analysis.**
+
+<!-- Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot. -->
